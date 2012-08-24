@@ -14,6 +14,7 @@ module Resque
   class Job
     include Helpers
     extend Helpers
+    include Resque::FreshdeskBase
 
     # Raise Resque::Job::DontPerform from a before_perform hook to
     # abort the job.
@@ -42,14 +43,7 @@ module Resque
     # Raises an exception if no queue or class is given.
     def self.create(queue, klass, *args)
       Resque.validate(klass, queue)
-
-      if Resque.inline?
-        # Instantiating a Resque::Job and calling perform on it so callbacks run
-        # decode(encode(args)) to ensure that args are normalized in the same manner as a non-inline job
-        new(:inline, {'class' => klass, 'args' => decode(encode(args))}).perform
-      else
-        Resque.push(queue, :class => klass.to_s, :args => args)
-      end
+      push_current_account_and_user
     end
 
     # Removes a job from a queue. Expects a string queue name, a
@@ -108,6 +102,7 @@ module Resque
       job = payload_class
       job_args = args || []
       job_was_performed = false
+      set_current_account_and_user
 
       begin
         # Execute before_perform hook. Abort the job gracefully if
